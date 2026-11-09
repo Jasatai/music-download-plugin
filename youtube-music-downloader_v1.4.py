@@ -711,12 +711,16 @@ if __name__ == "__main__":
     # get lyrics, best format possible
     print("downloading lyrics...")
     lyrics = get_lyrics(info)
+    # save lyrics as sidecar file
+    print("saving lyrics...")
+    save_lyrics(video_id, lyrics)
     # embed tags, lyrics and cover
-    print("embedding tags...")
-    embed_tags(track=info, cover_path=str(cover_path))
-    # save the lyrics as ttml or lrc format and also embed them into the track
-    print("saving and embedding lyrics...")
-    save_and_embed_lyrics(f"./{info['video_id']}.mp3", info["video_id"], lyrics)
+    print("embedding tags, lyrics, and cover...")
+    embed_tags(
+        track=info,
+        cover_path=str(cover_path),
+        lyrics=lyrics,
+    )
     # clean up
     print("cleaning up files...")
     cleanup_image(video_id)
