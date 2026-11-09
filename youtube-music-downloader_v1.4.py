@@ -206,66 +206,6 @@ def center_square_crop(video_id: str, directory: str = ".") -> Path:
 
     raise FileNotFoundError(f"No image thumbnail found for video ID {video_id!r}")
 
-def embed_tags(track: dict, cover_path: str) -> None:
-    video_id = track["video_id"]
-    mp3_path = Path.cwd() / f"{video_id}.mp3"
-
-    try:
-        tags = ID3(mp3_path)
-    except ID3NoHeaderError:
-        tags = ID3()
-
-    title = track.get("title") or ""
-    artists = track.get("artists") or []
-    album = track.get("album") or title
-    album_artists = track.get("album_artists") or artists
-    year = track.get("year")
-    track_number = track.get("track_number") or 1
-    disc_number = track.get("disc_number")
-
-    tags["TIT2"] = TIT2(encoding=3, text=[title])
-    tags["TPE1"] = TPE1(encoding=3, text=[", ".join(artists)])
-    tags["TALB"] = TALB(encoding=3, text=[album])
-    tags["TPE2"] = TPE2(encoding=3, text=[", ".join(album_artists)])
-
-    tags.delall("TDRC")
-    if year is not None:
-        tags.add(TDRC(encoding=3, text=[str(year)]))
-
-    tags.delall("TRCK")
-    if track_number is not None:
-        tags.add(TRCK(encoding=3, text=[str(track_number)]))
-
-    tags.delall("TPOS")
-    if disc_number is not None:
-        tags.add(TPOS(encoding=3, text=[str(disc_number)]))
-
-    # Multi-valued fields for Navidrome
-    tags.delall("TXXX:ARTISTS")
-    tags.add(TXXX(encoding=3, desc="ARTISTS", text=artists))
-
-    tags.delall("TXXX:ALBUMARTISTS")
-    tags.add(TXXX(encoding=3, desc="ALBUMARTISTS", text=album_artists))
-
-    # Embed the thumbnail as the front cover
-    mime_type, _ = mimetypes.guess_type(cover_path)
-    if not mime_type or not mime_type.startswith("image/"):
-        raise ValueError(f"Can't determine image type for {cover_path}")
-
-    with open(cover_path, "rb") as image_file:
-        image_data = image_file.read()
-
-    tags.delall("APIC")
-    tags.add(APIC(
-        encoding=3,
-        mime=mime_type,
-        type=3,  # Front cover
-        desc="Cover",
-        data=image_data,
-    ))
-
-    tags.save(mp3_path, v2_version=4)
-
 def _set_comment(audio: OggOpus, key: str, value) -> None:
     """Replace a Vorbis comment, removing any previous value."""
     if key in audio:
@@ -471,25 +411,6 @@ def get_lyrics(info: dict) -> dict | None:
         return lyrics
 
     return get_lrclib(info)
-
-def _lrc_lines(text: str) -> list[tuple[str, int]]:
-    """Return (lyric line, time in ms) pairs from LRC text."""
-    result = []
-    pattern = re.compile(r"\[(\d+):(\d{2})(?:[.:](\d{1,3}))?\](.*)")
-
-    for line in text.splitlines():
-        match = pattern.fullmatch(line.strip())
-        if not match:
-            continue
-
-        minutes, seconds, fraction, lyric = match.groups()
-        milliseconds = int((fraction or "0").ljust(3, "0"))
-        timestamp = (int(minutes) * 60 + int(seconds)) * 1000 + milliseconds
-        if lyric.strip():
-            result.append((lyric.strip(), timestamp))
-
-    return result
-
 
 def _ttml_lines(text: str) -> list[tuple[str, int]]:
     """Read line-level timed <p> entries from TTML."""
