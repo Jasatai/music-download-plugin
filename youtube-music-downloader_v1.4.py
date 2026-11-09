@@ -531,49 +531,6 @@ def _ttml_lines(text: str) -> list[tuple[str, int]]:
 
     return result
 
-
-def save_and_embed_lyrics(mp3_path: str, video_id: str, lyrics: dict | None) -> None:
-    if not lyrics or not lyrics.get("text"):
-        return
-
-    lyric_format = lyrics.get("format", "text").lower()
-    text = lyrics["text"]
-    extension = {"text": "txt"}.get(lyric_format, lyric_format)
-
-    # Save the original lyrics beside the MP3, e.g. G2PDJTkFiA8.lrc
-    Path(f"{video_id}.{extension}").write_text(text, encoding="utf-8")
-
-    if lyric_format == "lrc":
-        synced_lines = _lrc_lines(text)
-        plain_text = "\n".join(line for line, _ in synced_lines)
-    elif lyric_format == "ttml":
-        synced_lines = _ttml_lines(text)
-        plain_text = "\n".join(line for line, _ in synced_lines)
-    else:
-        synced_lines = []
-        plain_text = text
-
-    try:
-        tags = ID3(mp3_path)
-    except ID3NoHeaderError:
-        tags = ID3()
-
-    tags.delall("USLT")
-    tags.add(USLT(encoding=3, lang="XXX", desc="", text=plain_text))
-
-    tags.delall("SYLT")
-    if synced_lines:
-        tags.add(SYLT(
-            encoding=3,
-            lang="XXX",
-            format=2,  # timestamps are in milliseconds
-            type=1,    # lyrics
-            desc="",
-            text=synced_lines,
-        ))
-
-    tags.save(mp3_path, v2_version=4)
-
 def move_track_files(metadata: dict | None, path: str, video_id: str) -> list[Path]:
     """Move matching files from the current directory into the destination path."""
     source_dir = Path.cwd()
