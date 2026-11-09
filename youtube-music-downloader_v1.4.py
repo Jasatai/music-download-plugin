@@ -477,8 +477,8 @@ def move_track_files(metadata: dict | None, path: str, video_id: str) -> list[Pa
 
 
         def safe(value):
-            value = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(value))
-            return value.strip(" .") or "unknown"
+            value = str(value).replace("/", "_").replace("\x00", "_")
+            return value if value not in ("", ".", "..") else "unknown"
 
         def move_overwriting(source: Path, destination: Path) -> None:
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -519,32 +519,24 @@ def move_track_files(metadata: dict | None, path: str, video_id: str) -> list[Pa
         folder = target_root / safe(album_artist) / safe(album)
         filename_base = safe(f"{prefix}{artist} - {title}")
 
-        destinations = [
-            (p, folder / f"{filename_base}{p.suffix}")
-            for p in files
-        ]
+        IMAGE_EXTENSIONS = {
+            ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp",
+            ".avif", ".tif", ".tiff", ".ico",
+        }
+
+        destinations = []
+        for p in files:
+            if p.suffix.lower() in IMAGE_EXTENSIONS:
+                destination = folder / f"cover{p.suffix.lower()}"
+            else:
+                destination = folder / f"{filename_base}{p.suffix}"
+
+            destinations.append((p, destination))
 
         for source, destination in destinations:
             move_overwriting(source, destination)
 
         return [destination for _, destination in destinations]
-
-def cleanup_image(video_id: str) -> None:
-    IMAGE_EXTENSIONS = {
-        ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp",
-        ".avif", ".tif", ".tiff", ".ico",
-    }
-    if not video_id:
-        raise ValueError("URL has no 'v' query parameter")
-
-    for path in Path.cwd().iterdir():
-        if path.is_file() and path.stem == video_id and path.suffix.lower() in IMAGE_EXTENSIONS:
-            path.unlink()
-
-def cleanup_all(video_id: str) -> None:
-    for path in Path.cwd().iterdir():
-        if path.is_file() and path.stem == video_id:
-            path.unlink()
 
 if __name__ == "__main__":
     # ---------------
@@ -599,9 +591,6 @@ if __name__ == "__main__":
         cover_path=str(cover_path),
         lyrics=lyrics,
     )
-    # clean up
-    print("cleaning up files...")
-    cleanup_image(video_id)
     # move files to users library
     print("moving files...")
     move_track_files(metadata=info, path=library_path, video_id=video_id)
